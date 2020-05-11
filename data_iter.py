@@ -51,11 +51,13 @@ class FaceDataset(Dataset):
         image_ir = np.expand_dims(image_ir, -1)
 
         # random jitter
-        tmp_jitter = np.random.randint(-5, 5)
-        image_ir += tmp_jitter * 1.
+        if nd.random.randint(0, 100) < 10:
+            tmp_jitter = np.random.randint(-5, 5)
+            image_ir += tmp_jitter * 1.
         # random scale
-        scale_jitter = np.random.randint(90, 110) / 100
-        image_ir *= scale_jitter
+        if nd.random.randint(0, 100) < 10:
+            scale_jitter = np.random.randint(90, 110) / 100
+            image_ir *= scale_jitter
         # random crop
         if nd.random.randint(0, 100) > 50:
             image_ir = np.pad(image_ir, pad_width=((5, 5), (5, 5), (0, 0)),
