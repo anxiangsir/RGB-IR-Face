@@ -38,7 +38,8 @@ class FaceDataset(Dataset):
         image_rgb = cv2.resize(image_rgb, (54, 54))
         image_rgb = image_rgb / 255
         if nd.random.randint(0, 100) > 50:
-            image_rgb = np.pad(image_rgb, pad_width=((5, 5), (5, 5), (0, 0)), constant_values=0)
+            image_rgb = np.pad(image_rgb, pad_width=((5, 5), (5, 5), (0, 0)),
+                constant_values=0, mode='constant')
             image_rgb = nd.array(image_rgb)
             image_rgb = transforms.image.random_crop(image_rgb, (54, 54))[0]
         else:
@@ -49,7 +50,8 @@ class FaceDataset(Dataset):
         image_ar = cv2.resize(image_ar, (54, 54))
         image_ar = np.expand_dims(image_ar, -1)
         if nd.random.randint(0, 100) > 50:
-            image_ar = np.pad(image_ar, pad_width=((5, 5), (5, 5), (0, 0)), constant_values=0)
+            image_ar = np.pad(image_ar, pad_width=((5, 5), (5, 5), (0, 0)),
+                constant_values=0, mode='constant')
             image_ar = nd.array(image_ar)
             image_ar = transforms.image.random_crop(image_ar, (54, 54))[0]
         else:
