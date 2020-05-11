@@ -46,18 +46,26 @@ class FaceDataset(Dataset):
             image_rgb = nd.array(image_rgb)
         image_rgb = nd.transpose(image_rgb, (2, 0, 1))
 
-        image_ar = np.load(ar_path)
-        image_ar = cv2.resize(image_ar, (54, 54))
-        image_ar = np.expand_dims(image_ar, -1)
+        image_ir = np.load(ar_path)
+        image_ir = cv2.resize(image_ir, (54, 54))
+        image_ir = np.expand_dims(image_ir, -1)
+
+        # random jitter
+        tmp_jitter = np.random.randint(-30, 30)
+        image_ir += tmp_jitter
+        # random scale
+        scale_jitter = np.random.randint(50, 150) / 100
+        image_ir *= scale_jitter
+        # random crop
         if nd.random.randint(0, 100) > 50:
-            image_ar = np.pad(image_ar, pad_width=((5, 5), (5, 5), (0, 0)),
+            image_ir = np.pad(image_ir, pad_width=((5, 5), (5, 5), (0, 0)),
                 constant_values=0, mode='constant')
-            image_ar = nd.array(image_ar)
-            image_ar = transforms.image.random_crop(image_ar, (54, 54))[0]
+            image_ir = nd.array(image_ir)
+            image_ir = transforms.image.random_crop(image_ir, (54, 54))[0]
         else:
-            image_ar = nd.array(image_ar)
-        image_ar = nd.transpose(image_ar, (2, 0, 1))
-        return image_rgb, image_ar
+            image_ir = nd.array(image_ir)
+        image_ir = nd.transpose(image_ir, (2, 0, 1))
+        return image_rgb, image_ir
 
 
 class FaceDatasetTest(Dataset):
@@ -79,14 +87,14 @@ class FaceDatasetTest(Dataset):
         image = image / 255
         image = np.transpose(image, (2, 0, 1))
 
-        image_ar = np.load(ar_path)
-        image_ar = cv2.resize(image_ar, (54, 54))
-        image_ar = np.expand_dims(image_ar, 0)
+        image_ir = np.load(ar_path)
+        image_ir = cv2.resize(image_ir, (54, 54))
+        image_ir = np.expand_dims(image_ir, 0)
 
         image = nd.array(image)
-        image_ar = nd.array(image_ar)
+        image_ir = nd.array(image_ir)
 
-        return image, image_ar
+        return image, image_ir
 
 
 if __name__ == '__main__':
