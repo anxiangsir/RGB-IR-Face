@@ -24,17 +24,12 @@ image_list = [os.path.join("/root/huzechen_pairs", x) for x in image_list]
 
 
 def create_symbol():
-    data_rgb = mx.sym.var("data_rgb")
-    data_ir = mx.sym.var("data_ir")
-    sym_rgb = get_symbol(
-        data=data_rgb, num_classes=128, num_layers=18, version_output='H',
-        version_input=1, version_se=0, version_unit=1, version_act='relu',
+    data = mx.sym.var("data")
+    sym = get_symbol(
+        data=data, num_classes=256, num_layers=50, version_output='H',
+        version_input=0, version_se=0, version_unit=1, version_act='relu',
         dtype='float32', memonger=False, use_global_stats=False)
-    sym_ir = get_symbol(
-        data=data_ir, num_classes=128, num_layers=18, version_output='H',
-        version_input=1, version_se=0, version_unit=1, version_act='relu',
-        dtype='float32', memonger=False, use_global_stats=False)
-    return sym_rgb, sym_ir
+    return sym
 
 
 class ContrastiveLoss(object):
