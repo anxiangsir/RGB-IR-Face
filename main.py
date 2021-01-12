@@ -80,21 +80,17 @@ def main():
             mod.forward(mx.io.DataBatch([batch],), is_train=True)
             feat = mod.get_outputs(merge_multi_context=True)[0]
             feat.attach_grad()
-            feat = nd.reshape(feat, (-1, embedding_size * 2))
-
-            feat_s = feat[:, 0 * embedding_size: 1 * embedding_size]
-            feat_t = feat[:, 1 * embedding_size: 2 * embedding_size]
-
-            #
-            c = ContrastiveLoss()
-
             with ag.record():
+                feat = nd.reshape(feat, (-1, embedding_size * 2))
+                feat_s = feat[:, 0 * embedding_size: 1 * embedding_size]
+                feat_t = feat[:, 1 * embedding_size: 2 * embedding_size]
+                c = ContrastiveLoss()
                 l2loss = c(feat_s, feat_t)
             l2loss.backward()
             logger.info("step:%d loss:%f" % (step, nd.sum(l2loss).asscalar()))
 
-            grad_feat = nd.reshape(nd.concat(feat_s.grad, feat_t.grad, dim=-1), (-1, embedding_size))
-            mod.backward(out_grads=[grad_feat])
+            # grad_feat = nd.reshape(nd.concat(feat_s.grad, feat_t.grad, dim=-1), (-1, embedding_size))
+            mod.backward(out_grads=[feat.grad])
 
             if step % 1000 == 0:
                 mod.save_checkpoint(os.path.join(model_root, "tmp"), 0)
