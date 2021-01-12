@@ -35,6 +35,9 @@ class FaceDataset(Dataset):
         img_small = cv2.imread(path_small).astype(np.float32)
         img_large = cv2.imread(path_large).astype(np.float32)
 
+        img_small = cv2.resize(img_small, (128, 128))
+        img_large = cv2.resize(img_large, (128, 128))
+
         img_small = nd.expand_dims(nd.transpose(mx.nd.array(img_small), (2, 0, 1)), axis=0)
         img_large = nd.expand_dims(nd.transpose(mx.nd.array(img_large), (2, 0, 1)), axis=0)
 
