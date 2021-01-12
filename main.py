@@ -6,7 +6,7 @@ from mxnet import nd
 from mxnet.gluon.data import DataLoader
 from mxnet.lr_scheduler import PolyScheduler
 
-from data_iter import FaceDataset
+from data_iter import FaceDataset, batchify_fn
 from logger import setlogger
 from resnet import get_symbol
 
@@ -59,7 +59,7 @@ class ContrastiveLoss(object):
 
 def main():
     data_loader = DataLoader(
-        dataset=FaceDataset(path_list), batch_size=batch_size, shuffle=True, sampler=None,
+        dataset=FaceDataset(path_list), batch_size=batch_size, shuffle=True, sampler=None, batchify_fn=batchify_fn,
         last_batch='discard', batch_sampler=None, num_workers=16, thread_pool=False, prefetch=4)
 
     step = 0
@@ -76,7 +76,7 @@ def main():
         for batch in data_loader:
             mx.nd.waitall()
             step += 1
-            
+
             mod.forward(mx.io.DataBatch([batch],), is_train=True)
             feat = mod.get_outputs(merge_multi_context=True)[0]
             feat.attach_grad()
