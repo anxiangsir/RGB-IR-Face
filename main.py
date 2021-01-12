@@ -76,6 +76,7 @@ def main():
         for batch in data_loader:
             mx.nd.waitall()
             step += 1
+            
             mod.forward(mx.io.DataBatch([batch],), is_train=True)
             feat = mod.get_outputs(merge_multi_context=True)[0]
             feat.attach_grad()
