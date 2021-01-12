@@ -10,15 +10,7 @@ import mxnet as mx
 
 
 def batchify_fn(data):
-    """Collate data into batch."""
-    if isinstance(data[0], nd.NDArray):
-        return nd.concatenate(data, axis=0)
-    elif isinstance(data[0], tuple):
-        data = zip(*data)
-        return [batchify_fn(i) for i in data]
-    else:
-        data = np.asarray(data)
-        return nd.array(data, dtype=data.dtype)
+    return mx.nd.concat(*data, dim=0)
 
 
 class FaceDataset(Dataset):
