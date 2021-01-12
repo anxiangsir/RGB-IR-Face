@@ -1,6 +1,7 @@
 import os
 
 import mxnet as mx
+import mxnet.autograd as ag
 import numpy as np
 from mxnet import nd
 from mxnet.gluon.data import DataLoader
@@ -8,25 +9,25 @@ from mxnet.lr_scheduler import PolyScheduler
 
 from data_iter import FaceDataset
 from logger import setlogger
-import mxnet.autograd as ag
 from resnet import get_symbol
 
 #
 ctx = [mx.gpu(i) for i in range(4)]
+embedding_size = 256
 batch_size = 128
 max_update = 10000
 base_lr = 0.01
 model_root = "./"
+image_size = 108
 #
-image_list = os.listdir("/root/huzechen_pairs")
-image_list = [x for x in image_list if 'jpg' in x]
-image_list = [os.path.join("/root/huzechen_pairs", x) for x in image_list]
+
+path_list = [x.strip() for x in open("/train_tmp/images_car_reid/train_pairs.lst", "r").readlines()]
 
 
 def create_symbol():
     data = mx.sym.var("data")
     sym = get_symbol(
-        data=data, num_classes=256, num_layers=50, version_output='H',
+        data=data, num_classes=embedding_size, num_layers=50, version_output='H',
         version_input=0, version_se=0, version_unit=1, version_act='relu',
         dtype='float32', memonger=False, use_global_stats=False)
     return sym
@@ -59,7 +60,7 @@ class ContrastiveLoss(object):
 
 def main():
     data_loader = DataLoader(
-        dataset=FaceDataset(image_list[1000:]),
+        dataset=FaceDataset(path_list),
         batch_size=batch_size,
         shuffle=True,
         sampler=None,
@@ -70,40 +71,15 @@ def main():
         prefetch=4
     )
 
-    val_loader = DataLoader(
-        dataset=FaceDataset(image_list[:1000]),
-        batch_size=batch_size,
-        shuffle=False,
-        sampler=None,
-        last_batch='discard',
-        batch_sampler=None,
-        num_workers=16,
-        thread_pool=False,
-        prefetch=4
-    )
-
     step = 0
     logger = setlogger(models_root=model_root, rank=0)
-    sym_rgb, sym_ir = create_symbol()
-    mod_rgb = mx.mod.Module(sym_rgb, ('data_rgb',), context=ctx)
-    mod_ir = mx.mod.Module(sym_ir, ('data_ir',), context=ctx)
+    mod = mx.mod.Module(create_symbol(), context=ctx)
     #
-    mod_rgb.bind([('data_rgb', (batch_size, 3, 54, 54))])
-    mod_ir.bind([('data_ir', (batch_size, 1, 54, 54))])
+    mod.bind([('data', (batch_size * 2, 3, 54, 54))])
     #
-    mod_rgb.init_params()
-    mod_ir.init_params()
+    mod.init_params()
     #
-    mod_rgb.init_optimizer(
-        optimizer='sgd', optimizer_params={
-            'learning_rate': base_lr,
-            'lr_scheduler': PolyScheduler(max_update, base_lr),
-            'momentum': 0.9,
-            'wd': 5e-4,
-            'rescale_grad': 1 / batch_size,
-        })
-
-    mod_ir.init_optimizer(
+    mod.init_optimizer(
         optimizer='sgd', optimizer_params={
             'learning_rate': base_lr,
             'lr_scheduler': PolyScheduler(max_update, base_lr),
@@ -116,20 +92,23 @@ def main():
         for batch in data_loader:
             mx.nd.waitall()
             step += 1
-            mod_rgb.forward(mx.io.DataBatch([batch[0]]), is_train=True)
-            mod_ir.forward(mx.io.DataBatch([batch[1]]), is_train=True)
+            mod.forward(mx.io.DataBatch([batch[0]]), is_train=True)
 
-            feat_rgb = mod_rgb.get_outputs(merge_multi_context=True)[0]
-            feat_ir = mod_ir.get_outputs(merge_multi_context=True)[0]
+            feat = mod.get_outputs(merge_multi_context=True)[0]
+            feat.attach_grad()
+            feat = nd.reshape(feat, (-1, embedding_size * 2))
 
-            feat_rgb.attach_grad()
-            feat_ir.attach_grad()
+            feat_s = feat[0 * embedding_size: 1 * embedding_size]
+            feat_t = feat[1 * embedding_size: 2 * embedding_size]
+
+            #
             c = ContrastiveLoss()
+
             with ag.record():
-                l2loss = c(feat_rgb, feat_ir) + c(feat_ir, feat_rgb)
+                l2loss = c(feat_s, feat_t)
             l2loss.backward()
             logger.info("step:%d loss:%f" % (step, nd.sum(l2loss).asscalar()))
-            mod_rgb.backward(out_grads=[feat_rgb.grad])
+            mod.backward(out_grads=[feat_rgb.grad])
             mod_ir.backward(out_grads=[feat_ir.grad])
             mod_rgb.update()
             mod_ir.update()
