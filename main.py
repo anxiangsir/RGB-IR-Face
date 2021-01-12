@@ -82,8 +82,8 @@ def main():
             feat.attach_grad()
             feat = nd.reshape(feat, (-1, embedding_size * 2))
 
-            feat_s = feat[0 * embedding_size: 1 * embedding_size]
-            feat_t = feat[1 * embedding_size: 2 * embedding_size]
+            feat_s = feat[:, 0 * embedding_size: 1 * embedding_size]
+            feat_t = feat[:, 1 * embedding_size: 2 * embedding_size]
 
             #
             c = ContrastiveLoss()
