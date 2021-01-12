@@ -12,7 +12,7 @@ import mxnet as mx
 def batchify_fn(data):
     """Collate data into batch."""
     if isinstance(data[0], nd.NDArray):
-        return nd.concat(*data, dim=0)
+        return nd.concatenate(data, axis=0)
     elif isinstance(data[0], tuple):
         data = zip(*data)
         return [batchify_fn(i) for i in data]
