@@ -2,7 +2,6 @@ import os
 
 import mxnet as mx
 import mxnet.autograd as ag
-import numpy as np
 from mxnet import nd
 from mxnet.gluon.data import DataLoader
 from mxnet.lr_scheduler import PolyScheduler
@@ -60,40 +59,24 @@ class ContrastiveLoss(object):
 
 def main():
     data_loader = DataLoader(
-        dataset=FaceDataset(path_list),
-        batch_size=batch_size,
-        shuffle=True,
-        sampler=None,
-        last_batch='discard',
-        batch_sampler=None,
-        num_workers=16,
-        thread_pool=False,
-        prefetch=4
-    )
+        dataset=FaceDataset(path_list), batch_size=batch_size, shuffle=True, sampler=None,
+        last_batch='discard', batch_sampler=None, num_workers=16, thread_pool=False, prefetch=4)
 
     step = 0
     logger = setlogger(models_root=model_root, rank=0)
     mod = mx.mod.Module(create_symbol(), context=ctx)
-    #
-    mod.bind([('data', (batch_size * 2, 3, 54, 54))])
-    #
+    mod.bind([('data', (batch_size * 2, 3, image_size, image_size))])
     mod.init_params()
-    #
     mod.init_optimizer(
         optimizer='sgd', optimizer_params={
-            'learning_rate': base_lr,
-            'lr_scheduler': PolyScheduler(max_update, base_lr),
-            'momentum': 0.9,
-            'wd': 5e-4,
-            'rescale_grad': 1 / batch_size,
-        })
+            'learning_rate': base_lr, 'lr_scheduler': PolyScheduler(max_update, base_lr),
+            'momentum': 0.9, 'wd': 5e-4, 'rescale_grad': 1 / batch_size,})
 
     while True:
         for batch in data_loader:
             mx.nd.waitall()
             step += 1
-            mod.forward(mx.io.DataBatch([batch[0]]), is_train=True)
-
+            mod.forward(mx.io.DataBatch([batch],), is_train=True)
             feat = mod.get_outputs(merge_multi_context=True)[0]
             feat.attach_grad()
             feat = nd.reshape(feat, (-1, embedding_size * 2))
@@ -108,41 +91,40 @@ def main():
                 l2loss = c(feat_s, feat_t)
             l2loss.backward()
             logger.info("step:%d loss:%f" % (step, nd.sum(l2loss).asscalar()))
-            mod.backward(out_grads=[feat_rgb.grad])
-            mod_ir.backward(out_grads=[feat_ir.grad])
-            mod_rgb.update()
-            mod_ir.update()
+
+            grad_feat = nd.reshape(nd.concat(feat_s.grad, feat_t.grad, dim=-1), (-1, embedding_size))
+            mod.backward(out_grads=[grad_feat])
 
             if step % 1000 == 0:
-                mod_rgb.save_checkpoint(os.path.join(model_root, "model_rgb"), 0)
-                mod_ir.save_checkpoint(os.path.join(model_root, "model_ir"), 0)
+                mod.save_checkpoint(os.path.join(model_root, "tmp"), 0)
 
             if step % 300 == 0:
-                rgb_feat = []
-                ir_feat = []
-                for val_batch in val_loader:
-                    mod_rgb.forward(mx.io.DataBatch([val_batch[0]]), is_train=False)
-                    mod_ir.forward(mx.io.DataBatch([val_batch[1]]), is_train=False)
-                    rgb_feat.append(mod_rgb.get_outputs(merge_multi_context=True)[0])
-                    ir_feat.append(mod_ir.get_outputs(merge_multi_context=True)[0])
-                rgb_feat = nd.concat(*rgb_feat, dim=0)
-                ir_feat = nd.concat(*ir_feat, dim=0)
-
-                index = np.arange(len(rgb_feat))
-                score = []
-                for idx in range(ir_feat.shape[0]):
-                    pos_index = np.array([idx])
-                    negative_class_pool = np.setdiff1d(index, pos_index)
-                    neg_index = np.random.choice(negative_class_pool, 10, replace=False)
-                    all_index = np.concatenate((pos_index, neg_index), axis=0)
-                    _query_ir_feat = ir_feat[idx]
-                    _rgb_feat = rgb_feat[all_index]
-                    if nd.argmax(nd.dot(_query_ir_feat, _rgb_feat, transpose_b=True), axis=0).asscalar() == 0:
-                        score.append(True)
-                    else:
-                        score.append(False)
-                acc = sum(score) / len(score)
-                logger.info("step:%d acc:%f" % (step, acc))
+                pass
+                # rgb_feat = []
+                # ir_feat = []
+                # for val_batch in val_loader:
+                #     mod_rgb.forward(mx.io.DataBatch([val_batch[0]]), is_train=False)
+                #     mod_ir.forward(mx.io.DataBatch([val_batch[1]]), is_train=False)
+                #     rgb_feat.append(mod_rgb.get_outputs(merge_multi_context=True)[0])
+                #     ir_feat.append(mod_ir.get_outputs(merge_multi_context=True)[0])
+                # rgb_feat = nd.concat(*rgb_feat, dim=0)
+                # ir_feat = nd.concat(*ir_feat, dim=0)
+                #
+                # index = np.arange(len(rgb_feat))
+                # score = []
+                # for idx in range(ir_feat.shape[0]):
+                #     pos_index = np.array([idx])
+                #     negative_class_pool = np.setdiff1d(index, pos_index)
+                #     neg_index = np.random.choice(negative_class_pool, 10, replace=False)
+                #     all_index = np.concatenate((pos_index, neg_index), axis=0)
+                #     _query_ir_feat = ir_feat[idx]
+                #     _rgb_feat = rgb_feat[all_index]
+                #     if nd.argmax(nd.dot(_query_ir_feat, _rgb_feat, transpose_b=True), axis=0).asscalar() == 0:
+                #         score.append(True)
+                #     else:
+                #         score.append(False)
+                # acc = sum(score) / len(score)
+                # logger.info("step:%d acc:%f" % (step, acc))
 
 
 if __name__ == '__main__':
